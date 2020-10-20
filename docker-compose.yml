@@ -1,0 +1,97 @@
+version: '3'
+services:
+
+  ######## MONGODB SHARD0 ########
+
+  shard0-replica0:
+    build:
+      context: mongod
+    command: mongod -f /etc/mongod.conf --shardsvr --replSet shard0
+    volumes:
+      - ./mongod/mongod.conf:/etc/mongod.conf
+      - shard0-replica0-volume:/data/db/node0
+    networks:
+      internalnetwork:
+        aliases:
+          - shard0-replica0
+    environment:
+      - REPSET_NAME=shard0
+      - MONGO_DATA_DIR=/data/db/node0
+      - MONGO_LOG_DIR=/dev/null
+    expose:
+      - "27017"
+    ports:
+      - "26000:27017"  
+
+  ######## MONGODB SHARD1 ########
+
+  shard1-replica0:
+    build:
+      context: mongod
+    command: mongod -f /etc/mongod.conf --shardsvr --replSet shard1
+    volumes:
+      - ./mongod/mongod.conf:/etc/mongod.conf
+      - shard1-replica0-volume:/data/db/node1
+    networks:
+      internalnetwork:
+        aliases:
+          - shard1-replica0
+    environment:
+      - REPSET_NAME=shard1
+      - MONGO_DATA_DIR=/data/db/node1
+      - MONGO_LOG_DIR=/dev/null  
+    expose:
+      - "27017"
+    ports:
+      - "26001:27017"    
+
+  ######## MONGODB CONFIGDB ########
+
+  configdb-replica0:
+    build:
+      context: mongod
+    command: mongod -f /etc/mongod.conf --configsvr --replSet configdb
+    volumes:
+      - ./mongod/mongod.conf:/etc/mongod.conf
+      - configdb-replica0-volume:/data/db/node1
+    networks:
+      internalnetwork:
+        aliases:
+          - configdb-replica0
+    environment:
+      - REPSET_NAME=configdb
+      - MONGO_DATA_DIR=/data/db/node2
+      - MONGO_LOG_DIR=/dev/null  
+    expose:
+      - "27017"
+    ports:
+      - "27017:27017"  
+
+  ######## MONGODB MONGOS ########
+
+  mongos-router0:
+    build:
+      context: mongos
+    command: mongos --port 27017 --bind_ip 0.0.0.0 --configdb "configdb/configdb-replica0:27017"
+    depends_on:
+      - shard0-replica0
+      - shard1-replica0
+      - configdb-replica0
+    networks:
+      internalnetwork:
+        aliases:
+          - mongos-router0
+    environment:
+      - SHARD_LIST=shard0/shard0-replica0:27017;shard1/shard1-replica0:27017
+    expose:
+      - "27017"
+    ports:
+      - "26003:27017"
+
+networks:
+  internalnetwork: {}
+
+volumes:
+  shard0-replica0-volume:
+  shard1-replica0-volume:
+  configdb-replica0-volume:
